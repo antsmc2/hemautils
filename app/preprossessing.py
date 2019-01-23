@@ -149,6 +149,7 @@ class VideoAttributes(object):
         ave_frame_rate = skvideo.io.ffprobe(filepath)['video']['@avg_frame_rate'] 
         self.channels = get_rgb_channels(filepath)
         self.frame_rate = int(ave_frame_rate.split('/')[0])/int(ave_frame_rate.split('/')[1]) 
+        self.frame_count = len(self.channels[0])     # no reason, just picked red to get the frame size
         red_channel, green_channel, blue_channel = self.channels
         self.red_channel = get_channel_average(get_roi(red_channel), RED)
         self.green_channel = get_channel_average(get_roi(green_channel), GREEN)

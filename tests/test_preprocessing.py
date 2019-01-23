@@ -258,6 +258,13 @@ class TestFilters(object):
         assert np.all(video_attributes.channels[1] == green)
         assert np.all(video_attributes.channels[2] == blue)
         
+    def test_initiate_video_attributes_returns_frame_count_same_as_each_channel(self, test_video):
+        video_attributes = VideoAttributes(test_video)
+        red, green, blue = video_attributes.channels
+        assert video_attributes.frame_count == len(red)
+        assert video_attributes.frame_count == len(green)
+        assert video_attributes.frame_count == len(blue)
+        
     def test_initiate_video_attributes_instances_frame_rate_value(self, test_video):
         ave_frame_rate = skvideo.io.ffprobe(test_video)['video']['@avg_frame_rate'] 
         frame_rate = int(ave_frame_rate.split('/')[0])/int(ave_frame_rate.split('/')[1]) 
