@@ -7,4 +7,5 @@ Detailed documentation
 
 ## Tests
 coverage3 run --source=app,filters,settings -m pytest tests
+
 coverage3 report -m
