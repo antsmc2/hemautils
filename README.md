@@ -6,5 +6,6 @@ Utilities to handle non invasive hemoglobin analysis implemented in python3.
 Detailed documentation
 
 ## Tests
-coverage3 run --source=app,filters,settings -m pytest tests
-coverage3 report -m
+> coverage3 run --source=app,filters,settings -m pytest tests
+
+> coverage3 report -m
