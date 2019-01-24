@@ -203,12 +203,36 @@ class TestFilters(object):
         sample_rate = 100
         zero_peak = 200
         mixed_signal = mix_freq_mod_signal_generator(zero_peak, sample_rate, duration, 5, 10, 20)
-        peak_values = get_nominal_values(mixed_signal, 20, sample_rate)
+        peak_values, _ = get_nominal_values(mixed_signal, 20, sample_rate)
         df = pd.DataFrame({'peak': peak_values})
         assert len(df.query('peak > (@zero_peak + 5) and peak < (@zero_peak + 10)')) == 5 * duration      # there should be 5 peaks meeting this criteria per cycle
         assert len(df.query('peak > (@zero_peak + 10) and peak < (@zero_peak + 20)')) == 5 * duration     # there should be 5 peaks meeting this criteria per cycle
         assert len(df.query('peak > (@zero_peak + 20) and peak < (@zero_peak + 25)')) == 5 * duration
         assert len(df.query('peak > (@zero_peak + 25) and peak < (@zero_peak + 30)')) == 5 * duration
+        
+    def test_nominal_peak_return_frame_ids_in_sync_with_peaks(self):
+        #first create sign waves having multiple frequencies and multiple peaks
+        duration = 50
+        sample_rate = 100
+        zero_peak = 200
+        mixed_signal = mix_freq_mod_signal_generator(zero_peak, sample_rate, duration, 5, 10, 20)
+        mixed_signal = np.array(mixed_signal.data)       # to enable sequential indexing
+        peak_values, frame_ids = get_nominal_values(mixed_signal, 20, sample_rate)
+        assert len(peak_values) == len(frame_ids)
+        for index, id in enumerate(frame_ids):
+            assert mixed_signal[id] == peak_values[index]        
+            
+    def test_trough_peak_return_frame_ids_in_sync_with_peaks(self):
+        #first create sign waves having multiple frequencies and multiple peaks
+        duration = 50
+        sample_rate = 100
+        zero_peak = 200
+        mixed_signal = mix_freq_mod_signal_generator(zero_peak, sample_rate, duration, 5, 10, 20)
+        mixed_signal = np.array(mixed_signal.data)       # to enable sequential indexing
+        trough_values, frame_ids = get_lowest_values(mixed_signal, 20, sample_rate)
+        assert len(trough_values) == len(frame_ids)
+        for index, id in enumerate(frame_ids):
+            assert mixed_signal[id] == trough_values[index]      
         
     def test_trough_extractor_returns_correct_nominal_troughs_within_each_given_frequency(self):
         #first create sign waves having multiple frequencies and multiple peaks
@@ -216,7 +240,7 @@ class TestFilters(object):
         sample_rate = 100
         zero_peak = 100
         mixed_signal = mix_freq_mod_signal_generator(zero_peak, sample_rate, duration, 5, 10, 20)
-        trough_values = get_lowest_values(mixed_signal, 20, sample_rate)
+        trough_values, _ = get_lowest_values(mixed_signal, 20, sample_rate)
         df = pd.DataFrame({'trough': trough_values})
         assert len(df.query('trough < (@zero_peak - 5) and trough > (@zero_peak - 10)')) == 5 * duration      # there should be 5 peaks meeting this criteria per cycle
         assert len(df.query('trough < (@zero_peak - 10) and trough > (@zero_peak - 20)')) == 5 * duration     # there should be 5 peaks meeting this criteria per cycle
@@ -228,7 +252,7 @@ class TestFilters(object):
         sample_rate = 100
         zero_peak = 250
         mixed_signal = mix_freq_mod_signal_generator2(zero_peak, sample_rate, duration, 5, 10, 20)
-        peak_values = get_channel_ave_nominal_values(mixed_signal.data, sample_rate, 7, nominal_frequency_adjustment=1)      
+        peak_values, _ = get_channel_ave_nominal_values(mixed_signal.data, sample_rate, 7, nominal_frequency_adjustment=1)      
         df = pd.DataFrame({'peak': peak_values})
         # Since 5hz is filtered off, the next nominal frequency is 10Hz. 
         # The filtered wave form we should have only one peak within peak > (@zero_peak + 10) and peak < (@zero_peak + 20) every 0.1 seconds.
@@ -244,7 +268,7 @@ class TestFilters(object):
         sample_rate = 100
         zero_peak = 250
         mixed_signal = mix_freq_mod_signal_generator2(zero_peak, sample_rate, duration, 5, 10, 20)
-        trough_values = get_channel_ave_trough_values(mixed_signal.data, sample_rate, 7, nominal_frequency_adjustment=1)      
+        trough_values, _ = get_channel_ave_trough_values(mixed_signal.data, sample_rate, 7, nominal_frequency_adjustment=1)      
         df = pd.DataFrame({'trough': trough_values})
         # Similar to get_channel_ave_nominal_values  but inverted.
         assert len(df.query('trough < (@zero_peak - 10) and trough > (@zero_peak - 20)')) == 0    
@@ -282,17 +306,17 @@ class TestFilters(object):
         video_attributes = VideoAttributes(test_video)
         red, green, blue = video_attributes.channels
         frame_rate = video_attributes.frame_rate
-        assert np.all(video_attributes.nominal_red == get_channel_ave_nominal_values(get_channel_average(get_roi(red), RED), frame_rate))
-        assert np.all(video_attributes.nominal_green == get_channel_ave_nominal_values(get_channel_average(get_roi(green), GREEN), frame_rate))
-        assert np.all(video_attributes.nominal_blue == get_channel_ave_nominal_values(get_channel_average(get_roi(blue), BLUE), frame_rate))
+        assert np.all(video_attributes.nominal_red.peak == get_channel_ave_nominal_values(get_channel_average(get_roi(red), RED), frame_rate)[0])
+        assert np.all(video_attributes.nominal_green.peak == get_channel_ave_nominal_values(get_channel_average(get_roi(green), GREEN), frame_rate)[0])
+        assert np.all(video_attributes.nominal_blue.peak == get_channel_ave_nominal_values(get_channel_average(get_roi(blue), BLUE), frame_rate)[0])
             
     def test_initiate_video_attributes_has_correct_channel_through_values_available(self, test_video):
         video_attributes = VideoAttributes(test_video)
         red, green, blue = video_attributes.channels
         frame_rate = video_attributes.frame_rate
-        assert np.all(video_attributes.trough_red == get_channel_ave_trough_values(get_channel_average(get_roi(red), RED), frame_rate))
-        assert np.all(video_attributes.trough_green == get_channel_ave_trough_values(get_channel_average(get_roi(green), GREEN), frame_rate))
-        assert np.all(video_attributes.trough_blue == get_channel_ave_trough_values(get_channel_average(get_roi(blue), BLUE), frame_rate))
+        assert np.all(video_attributes.trough_red.trough == get_channel_ave_trough_values(get_channel_average(get_roi(red), RED), frame_rate)[0])
+        assert np.all(video_attributes.trough_green.trough == get_channel_ave_trough_values(get_channel_average(get_roi(green), GREEN), frame_rate)[0])
+        assert np.all(video_attributes.trough_blue.trough == get_channel_ave_trough_values(get_channel_average(get_roi(blue), BLUE), frame_rate)[0])
         
     
         

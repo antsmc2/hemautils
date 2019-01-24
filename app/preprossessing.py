@@ -48,10 +48,10 @@ def get_frequency_properties(channel_signal, frequency, sample_rate):
     frames_per_cycle = int(round(sample_rate / frequency))
     # now get how many full cycles are in the channel_signal
     cycles = int(math.floor(channel_signal.size / frames_per_cycle))
-    return channel_signal[:frames_per_cycle * cycles], frames_per_cycle, cycles
+    return channel_signal.copy()[:frames_per_cycle * cycles], frames_per_cycle, cycles
 
 
-def get_nominal_values(channel_signal, frequency, sample_rate):
+def get_nominal_values(cchannel_signal, frequency, sample_rate):
     '''Returns the nominal values of given channel_signal derived by imposing given frequency on given signal
     
     Parameters
@@ -79,11 +79,16 @@ def get_nominal_values(channel_signal, frequency, sample_rate):
     >>> df = pd.DataFrame({'peak': np.abs(fforms), 'freqs': freqs})
     >>> fpeak_max = df.query('freqs > 0')['peak'].max()
     >>> frequency_max = df.query('peak == @fpeak_max and freqs > 0')['freqs'].max()
-    >>> blue_nominal_values = get_nominal_values(blue_channel, frequency_max*3/4, sample_rate)
+    >>> blue_nominal_values, frame_ids = get_nominal_values(blue_channel, frequency_max*3/4, sample_rate)
     '''
-    channel_signal, frames_per_cycle, cycles = get_frequency_properties(channel_signal, frequency, sample_rate)
+    channel_signal, frames_per_cycle, cycles = get_frequency_properties(cchannel_signal, frequency, sample_rate)
     # resize channel_signal as per the number frames per cycle, discarding uncompleted channels
-    return np.max(channel_signal.reshape((cycles, frames_per_cycle)), axis=1)
+    channel_signal = channel_signal.reshape((cycles, frames_per_cycle))
+    indexes =  np.argmax(channel_signal, axis=1)
+    frame_ids = []
+    for idx, val in enumerate(indexes):
+        frame_ids.append(idx*frames_per_cycle + val)
+    return np.max(channel_signal, axis=1), np.array(frame_ids)
 
 
 def get_lowest_values(channel_signal, frequency, sample_rate):
@@ -114,11 +119,16 @@ def get_lowest_values(channel_signal, frequency, sample_rate):
     >>> df = pd.DataFrame({'peak': np.abs(fforms), 'freqs': freqs})
     >>> fpeak_max = df.query('freqs > 0')['peak'].max()
     >>> frequency_max = df.query('peak == @fpeak_max and freqs > 0')['freqs'].max()
-    >>> blue_lowest_values = get_lowest_values(blue_channel, frequency_max*3/4, sample_rate)
+    >>> blue_lowest_values, frame_ids = get_lowest_values(blue_channel, frequency_max*3/4, sample_rate)
     '''
     channel_signal, frames_per_cycle, cycles = get_frequency_properties(channel_signal, frequency, sample_rate)
     # resize channel_signal as per the number frames per cycle, discarding uncompleted channels
-    return np.min(channel_signal.reshape((cycles, frames_per_cycle)), axis=1)
+    channel_signal = channel_signal.reshape((cycles, frames_per_cycle))
+    indexes =  np.argmin(channel_signal, axis=1)
+    frame_ids = []
+    for idx, val in enumerate(indexes):
+        frame_ids.append(idx*frames_per_cycle + val)
+    return np.min(channel_signal, axis=1), np.array(frame_ids)
 
 
 def get_channel_ave_nominal_values(channel_signal, frame_rate, cutoff_frequency=BREATHING_CUTOFF_FREQUENCY, nominal_frequency_adjustment=0.75):
@@ -149,14 +159,19 @@ class VideoAttributes(object):
         ave_frame_rate = skvideo.io.ffprobe(filepath)['video']['@avg_frame_rate'] 
         self.channels = get_rgb_channels(filepath)
         self.frame_rate = int(ave_frame_rate.split('/')[0])/int(ave_frame_rate.split('/')[1]) 
-        self.frame_count = len(self.channels[0])     # no reason, just picked red to get the frame size
-        red_channel, green_channel, blue_channel = self.channels
-        self.red_channel = get_channel_average(get_roi(red_channel), RED)
-        self.green_channel = get_channel_average(get_roi(green_channel), GREEN)
-        self.blue_channel = get_channel_average(get_roi(blue_channel), BLUE)
-        self.nominal_red = get_channel_ave_nominal_values(self.red_channel, self.frame_rate)
-        self.nominal_blue = get_channel_ave_nominal_values(self.blue_channel, self.frame_rate)
-        self.nominal_green = get_channel_ave_nominal_values(self.green_channel, self.frame_rate)
-        self.trough_red = get_channel_ave_trough_values(self.red_channel, self.frame_rate)
-        self.trough_blue = get_channel_ave_trough_values(self.blue_channel, self.frame_rate)
-        self.trough_green = get_channel_ave_trough_values(self.green_channel, self.frame_rate)
+        self.frame_count = len(self.channels[0])                 
+        self.red_channel = get_channel_average(get_roi(self.channels[0]), RED)
+        self.green_channel = get_channel_average(get_roi(self.channels[1]), GREEN)
+        self.blue_channel = get_channel_average(get_roi(self.channels[2]), BLUE)
+        peaks, frame_ids = get_channel_ave_nominal_values(self.red_channel, self.frame_rate)
+        self.nominal_red = pd.DataFrame({'peak': peaks, 'frame_id': frame_ids})
+        peaks, frame_ids = get_channel_ave_nominal_values(self.green_channel, self.frame_rate)
+        self.nominal_green = pd.DataFrame({'peak': peaks, 'frame_id': frame_ids})
+        peaks, frame_ids = get_channel_ave_nominal_values(self.blue_channel, self.frame_rate)
+        self.nominal_blue = pd.DataFrame({'peak': peaks, 'frame_id': frame_ids})
+        troughs, frame_ids = get_channel_ave_trough_values(self.red_channel, self.frame_rate)
+        self.trough_red = pd.DataFrame({'trough': troughs, 'frame_id': frame_ids})
+        troughs, frame_ids = get_channel_ave_trough_values(self.green_channel, self.frame_rate)
+        self.trough_green = pd.DataFrame({'trough': troughs, 'frame_id': frame_ids})
+        troughs, frame_ids = get_channel_ave_trough_values(self.blue_channel, self.frame_rate)
+        self.trough_blue = pd.DataFrame({'trough': troughs, 'frame_id': frame_ids})
