@@ -2,6 +2,8 @@
 
 Utilities to handle non invasive hemoglobin analysis implemented in python3. 
 
+Current work is based on [this](https://ubicomplab.cs.washington.edu/pdfs/hemaapp.pdf) research study.
+
 ## To do
 Detailed documentation
 
